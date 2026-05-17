@@ -1,0 +1,8 @@
+node_modules
+.env
+mysql-data
+dist
+build
+coverage
+logs
+*.log
