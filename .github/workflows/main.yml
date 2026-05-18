@@ -1,1 +1,63 @@
+name: Production cicd fullstackapp
 
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  tesing-check:
+    name: Run tests and check code quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout code
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      # check code backend test
+      - name: Install backend dependencies 
+        run: npm ci
+        working-directory: ./backend
+      - name: Run backend tests
+        run: npm test
+        working-directory: ./backend
+      # check code frontend test
+      - name: Install frontend dependencies 
+        run: npm ci
+        working-directory: ./frontend
+      - name: Run frontend tests
+        run: npm test
+        working-directory: ./frontend
+      
+      #sonarcloud check
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@v2
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.projectKey=buicongthanh861_Chatapp-realtime
+            -Dsonar.organization=java-woof
+            -Dsonar.host.url=https://sonarcloud.io/
+      #sonarcloud quality gate check
+      - name: SonarCloud Quality Gate Check
+        uses: SonarSource/sonarqube-quality-gate-action@v1
+        timeout-minutes: 5
+        continue-on-error: true
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      #synk check backend
+
+      - name: Snyk Scan Backend
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN_FULLSTACK }}
+        with:
+          args: --org=buicongthanh861 --all-projects --severity-threshold=high
+        continue-on-error: true
+  
