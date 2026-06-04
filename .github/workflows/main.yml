@@ -153,8 +153,8 @@ jobs:
       
       - name: update k8s deployment file
         run: |
-          yq e -i "..image.tag = \"${GITHUB_SHA}\"" Chatapp-Infa/k8s/frontend/values.yaml
-          yq e -i "..image.tag = \"${GITHUB_SHA}\"" Chatapp-Infa/k8s/backend/values.yaml
+          yq e -i ".image.tag = \"${GITHUB_SHA}\"" Chatapp-Infa/k8s/frontend/values.yaml
+          yq e -i ".image.tag = \"${GITHUB_SHA}\"" Chatapp-Infa/k8s/backend/values.yaml
       
       - name: Show values after update
         run: |
