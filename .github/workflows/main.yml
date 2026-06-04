@@ -12,6 +12,7 @@ jobs:
   tesing-check:
     name: Run tests and check code quality
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: checkout code
         uses: actions/checkout@v4
@@ -55,6 +56,7 @@ jobs:
 
       - name: Snyk Scan Backend
         uses: snyk/actions/node@master
+        timeout-minutes : 5
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN_FULLSTACK }}
         with:
@@ -66,6 +68,7 @@ jobs:
     name: Build and deploy to AWS
     runs-on: ubuntu-latest
     needs: tesing-check
+    timeout-minutes: 20
     if: github.event_name == 'push'
 
     steps:
@@ -104,4 +107,77 @@ jobs:
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG ./frontend
           docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
           docker push $ECR_REGISTRY/$ECR_REPOSITORY --all-tags
+
+  gitops-deploy:
+    name: Deploy to kubernets using gitops
+    runs-on: ubuntu-latest
+    needs: build-and-deploy
+    timeout-minutes: 20
+    steps:
+      - name: checkout code
+        uses: actions/checkout@v4
+        with:
+          repository: buicongthanh861/Chatapp-Infa
+          token: ${{ secrets.CHATAPP_TOKEN }}
+          path: Chatapp-Infa
+      - name: Debug repo
+        run: |
+          set -euxo pipefail
+
+          echo "Current directory:"
+          pwd
+
+          echo "List files:"
+          ls -la
+
+          echo "Infra repo files:"
+          ls -la Chatapp-Infa
+
+          echo "Current branch:"
+          cd Chatapp-Infa
+          git branch
+      - name: Show values before update
+        run: |
+          echo "=== FRONTEND BEFORE ==="
+          cat Chatapp-Infa/k8s/frontend/values.yaml
+
+          echo "=== BACKEND BEFORE ==="
+          cat Chatapp-Infa/k8s/backend/values.yaml  
+      - name: setup yqcli
+        run: | 
+          sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq
+          sudo chmod +x /usr/bin/yq
+      
+      - name: Check yq
+        run: yq --version
+      
+      - name: update k8s deployment file
+        run: |
+          yq e -i "..image.tag = \"${GITHUB_SHA}\"" Chatapp-Infa/k8s/frontend/values.yaml
+          yq e -i "..image.tag = \"${GITHUB_SHA}\"" Chatapp-Infa/k8s/backend/values.yaml
+      
+      - name: Show values after update
+        run: |
+          echo "=== FRONTEND AFTER ==="
+          cat Chatapp-Infa/k8s/frontend/values.yaml
+
+          echo "=== BACKEND AFTER ==="
+          cat Chatapp-Infa/k8s/backend/values.yaml
+      
+      - name: Git diff
+        run: |
+          cd Chatapp-Infa
+          
+          echo "Git status:"
+          git status
+          echo "Git diff:"
+          git diff
+      - name: Commit and Push changes
+        run: |
+          cd Chatapp-Infa
+          git config --global user.email "github-actions@github.com"
+          git config --global user.name "github-actions"
+          git add .
+          git commit -m "chore: update image tags to ${{ github.sha }} [skip ci]"
+          git push origin main
   
